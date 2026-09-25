@@ -1,5 +1,5 @@
-/* User Persona WorldForge - v1.7.2 (Fix reasoning_effort Validation Error) */
-const EXT = 'user-persona-worldforge', VERSION = '1.7.2';
+/* User Persona WorldForge - v1.7.3 (Auto Reasoning Effort & Chat Completion Fix) */
+const EXT = 'user-persona-worldforge', VERSION = '1.7.3';
 
 const MENU_TREE = [
   {
@@ -894,11 +894,24 @@ Requirements:
 Return ONLY the outfit description directly.`;
 }
 
+// 提取当前酒馆使用的思考强度设置，默认回退到 'auto' 或 'medium'
+function getSafeReasoningEffort() {
+  try {
+    const p = ctx.powerUser;
+    if (p?.reasoning_effort && typeof p.reasoning_effort === 'string') {
+      return p.reasoning_effort;
+    }
+  } catch {}
+  return 'auto';
+}
+
 // 核心自适应生成层：解决 reasoning_effort 强校验与 502 错误
 async function executeGeneration(prompt) {
   if (settings.apiMode === 'custom') {
     return await requestCustomApi(prompt);
   }
+
+  const safeEffort = getSafeReasoningEffort();
 
   // 1. 尝试使用酒馆原生静默生成，传入受控的 reasoning_effort 参数规避校验拦截
   if (typeof ctx.generateQuietPrompt === 'function') {
@@ -907,10 +920,11 @@ async function executeGeneration(prompt) {
         quietPrompt: prompt,
         quietToLoud: false,
         skipWIAN: true,
-        // 传递合法白名单参数，防止后端报 'reasoning_effort must be one of...' 错误
-        reasoning_effort: 'medium',
+        // 传递明确合规参数，防止后端抛出 validation error
+        reasoning_effort: safeEffort,
+        chat_completion_source: 'openai',
         extra_body: {
-          reasoning_effort: 'medium'
+          reasoning_effort: safeEffort
         }
       };
       if (settings.selectedPreset) options.preset = settings.selectedPreset;
@@ -921,7 +935,7 @@ async function executeGeneration(prompt) {
     }
   }
 
-  // 2. 降级兜底：通过酒馆的代理端点直接请求，完全净化冲突参数
+  // 2. 降级兜底：通过酒馆官方后端 chat-completions 代理端点直接请求，显式带上 reasoning_effort
   try {
     const rawRes = await fetch('/api/backends/chat-completions/generate', {
       method: 'POST',
@@ -929,7 +943,7 @@ async function executeGeneration(prompt) {
       body: JSON.stringify({
         messages: [{ role: 'user', content: prompt }],
         stream: false,
-        reasoning_effort: 'medium'
+        reasoning_effort: safeEffort === 'auto' ? 'medium' : safeEffort
       })
     });
     if (rawRes.ok) {
@@ -1061,6 +1075,7 @@ backstory:
 </user_persona>`;
 }
 
+// 副 API 请求：自适应思考/推理模型
 async function requestCustomApi(prompt) {
   if (!settings.customApiUrl) throw Error('请在⚙️设置中填写自定义 API URL');
   
@@ -1075,13 +1090,12 @@ async function requestCustomApi(prompt) {
     messages: [
       { role: 'system', content: 'You are an expert character architect.' },
       { role: 'user', content: prompt }
-    ]
+    ],
+    reasoning_effort: 'medium'
   };
 
   if (!isReasoningModel) {
     requestBody.temperature = 0.8;
-  } else {
-    requestBody.reasoning_effort = 'medium';
   }
 
   const res = await fetch(settings.customApiUrl, {
