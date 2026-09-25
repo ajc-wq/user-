@@ -1,5 +1,5 @@
-/* User Persona WorldForge - v1.7.4 (Fix API Routing & Key Mismatch) */
-const EXT = 'user-persona-worldforge', VERSION = '1.7.4';
+/* User Persona WorldForge - v1.8.0 (Qianye-Style Settings & Direct API Engine) */
+const EXT = 'user-persona-worldforge', VERSION = '1.8.0';
 
 const MENU_TREE = [
   {
@@ -199,7 +199,7 @@ const THEMES = [
   { id: 'warm', name: '🍂 暖杏米白' }
 ];
 
-let ctx, settings, isOpen = false, isSettingsOpen = false;
+let ctx, settings, isOpen = false, isSettingsOpen = false, isPresetPickerOpen = false;
 
 function log(...a) { console.debug(`[${EXT}]`, ...a); }
 function toast(m, t = 'info') { try { (ctx?.toastr || window.toastr)?.[t]?.(m); } catch {} }
@@ -224,10 +224,11 @@ function ensureSettings() {
     generated: '',
     currentOutfitPreview: '',
     wardrobeList: [],
-    apiMode: 'st',
-    customApiUrl: 'https://api.openai.com/v1/chat/completions',
+    // 线路设置：默认采用独立 API，避免酒馆主通道发生路由和 Key 错位
+    apiRoute: 'independent', // 'independent' (独立 API) 或 'st_main' (酒馆主 API)
+    customApiUrl: 'https://gcli.ggchan.dev/v1',
     customApiKey: '',
-    customModel: 'gpt-4o-mini',
+    customModel: 'gemini-2.5-pro',
     selectedPreset: '',
     ...(root[EXT] || {})
   };
@@ -249,6 +250,7 @@ function toggleModal(show) {
   } else {
     modal.classList.remove('visible');
     toggleSettingsPanel(false);
+    togglePresetPicker(false);
   }
 }
 
@@ -257,6 +259,13 @@ function toggleSettingsPanel(show) {
   if (!panel) return;
   isSettingsOpen = typeof show === 'boolean' ? show : !isSettingsOpen;
   panel.style.display = isSettingsOpen ? 'flex' : 'none';
+}
+
+function togglePresetPicker(show) {
+  const picker = document.querySelector('#upw-preset-picker-dialog');
+  if (!picker) return;
+  isPresetPickerOpen = typeof show === 'boolean' ? show : !isPresetPickerOpen;
+  picker.style.display = isPresetPickerOpen ? 'flex' : 'none';
 }
 
 async function listWorlds() {
@@ -495,7 +504,7 @@ function render() {
         <select id="upw-theme" class="upw-compact-select">
           ${THEMES.map(th => `<option value="${th.id}" ${th.id === settings.theme ? 'selected' : ''}>${th.name}</option>`).join('')}
         </select>
-        <button id="upw-open-settings" class="upw-icon-btn" title="设置（缩放/预设/API）">⚙️</button>
+        <button id="upw-open-settings" class="upw-icon-btn" title="设置（线路/预设/API）">⚙️ 设置</button>
         <button id="upw-close" class="upw-close-icon" title="关闭窗口">✕</button>
       </div>
     </div>
@@ -550,16 +559,71 @@ function render() {
       <button id="upw-btn-import" class="upw-import-action">📥 导入Persona</button>
     </div>
 
-    <!-- ⚙️ 统一设置模态弹窗 -->
+    <!-- ⚙️ 千夜风格专属配置弹窗 -->
     <div id="upw-settings-modal" class="upw-submodal-mask" style="display: none;">
-      <div class="upw-submodal-card">
+      <div class="upw-submodal-card upw-qy-card">
         <div class="upw-submodal-head">
-          <span>⚙️ 助手设置中心</span>
+          <span>⚙️ 设置</span>
           <button id="upw-settings-close" class="upw-close-icon">✕</button>
         </div>
         <div class="upw-submodal-body">
-          <div class="upw-setting-section">
-            <div class="upw-section-title">🔍 界面大小调节</div>
+          
+          <!-- 1. 正文生成线路双轨选择 -->
+          <div class="upw-qy-field-group">
+            <div class="upw-qy-label">📼 正文生成线路</div>
+            <div class="upw-route-tabs">
+              <button class="upw-route-tab ${settings.apiRoute === 'independent' ? 'active' : ''}" data-route="independent">
+                <span>🔑 独立 API</span>
+              </button>
+              <button class="upw-route-tab ${settings.apiRoute === 'st_main' ? 'active' : ''}" data-route="st_main">
+                <span>🍷 酒馆主 API</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. API 预设选择器 -->
+          <div class="upw-qy-field-group">
+            <div class="upw-qy-label">📚 生成预设</div>
+            <div id="upw-open-preset-picker" class="upw-preset-display-box">
+              <span>${esc(settings.selectedPreset || '-- 选择酒馆预设 (跟随默认) --')}</span>
+              <span class="upw-arrow-down">▾</span>
+            </div>
+            <div class="upw-qy-tip">🛡️ 预设会自动套用酒馆内的上下文与输出规则。</div>
+          </div>
+
+          <!-- 3. 独立 API 表单（仅当切换为独立 API 时呈现） -->
+          <div id="upw-indep-form" style="display: ${settings.apiRoute === 'independent' ? 'flex' : 'none'}; flex-direction: column; gap: 12px;">
+            <div class="upw-qy-field-group">
+              <div class="upw-qy-label">请求格式</div>
+              <div class="upw-qy-subdesc">多数兼容服务保持自动即可</div>
+              <input class="upw-qy-input readonly" value="OpenAI Chat Completions 兼容格式" readonly>
+            </div>
+
+            <div class="upw-qy-field-group">
+              <div class="upw-qy-label">接口地址</div>
+              <div class="upw-qy-subdesc">只用于插件独立请求（支持带 /v1）</div>
+              <input id="upw-api-url" class="upw-qy-input" value="${esc(settings.customApiUrl)}" placeholder="https://gcli.ggchan.dev/v1">
+            </div>
+
+            <div class="upw-qy-field-group">
+              <div class="upw-qy-label">API Key</div>
+              <div class="upw-qy-subdesc">不会进入日志或备份</div>
+              <input id="upw-api-key" type="password" class="upw-qy-input" value="${esc(settings.customApiKey)}" placeholder="输入你的 API Key (如 gg-gcli-...)">
+            </div>
+
+            <div class="upw-qy-field-group">
+              <div class="upw-qy-label">模型</div>
+              <div class="upw-qy-subdesc">可以手填或读取线路列表</div>
+              <div class="upw-input-with-btn">
+                <input id="upw-api-model" class="upw-qy-input" value="${esc(settings.customModel)}" placeholder="例如：gemini-2.5-pro, gpt-4o">
+                <button id="upw-fetch-models-btn" class="upw-qy-btn-small">🔄 获取</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 界面缩放调节 -->
+          <div class="upw-qy-field-group">
+            <div class="upw-qy-label">🔍 界面缩放比例</div>
             <div class="upw-zoom-grid">
               ${[80, 90, 100, 110, 120].map(z => `
                 <button class="upw-zoom-btn ${settings.zoom === z ? 'active' : ''}" data-zoom="${z}">${z}%</button>
@@ -567,38 +631,27 @@ function render() {
             </div>
           </div>
 
-          <div class="upw-setting-section">
-            <div class="upw-section-title">📜 文本生成预设 (Preset)</div>
-            <select id="upw-preset-select" class="upw-input-field">
-              <option value="">跟随当前酒馆默认激活的预设</option>
-            </select>
-          </div>
-
-          <div class="upw-setting-section">
-            <div class="upw-section-title">🌐 AI 接口配置 (API)</div>
-            <div class="upw-radio-group">
-              <label><input type="radio" name="upw_api_mode" value="st" ${settings.apiMode === 'st' ? 'checked' : ''}> 跟随酒馆当前会话 API</label>
-              <label><input type="radio" name="upw_api_mode" value="custom" ${settings.apiMode === 'custom' ? 'checked' : ''}> 独立副 API</label>
-            </div>
-
-            <div id="upw-custom-api-box" class="upw-sub-form" style="display: ${settings.apiMode === 'custom' ? 'block' : 'none'};">
-              <label class="upw-form-item">
-                <span>API 接口地址 (URL)：</span>
-                <input id="upw-api-url" class="upw-input-field" value="${esc(settings.customApiUrl)}" placeholder="https://api.openai.com/v1/chat/completions">
-              </label>
-              <label class="upw-form-item">
-                <span>API 密钥 (Key)：</span>
-                <input id="upw-api-key" type="password" class="upw-input-field" value="${esc(settings.customApiKey)}" placeholder="sk-...">
-              </label>
-              <label class="upw-form-item">
-                <span>模型代号 (Model)：</span>
-                <input id="upw-api-model" class="upw-input-field" value="${esc(settings.customModel)}" placeholder="例如：gpt-4o, claude-3-5-sonnet">
-              </label>
-            </div>
-          </div>
         </div>
-        <div class="upw-submodal-foot">
-          <button id="upw-settings-save" class="upw-main-action">保存配置</button>
+
+        <div class="upw-submodal-foot upw-qy-foot">
+          <button id="upw-test-api-btn" class="upw-qy-action-btn secondary">🔌 测试连接</button>
+          <button id="upw-settings-save" class="upw-qy-action-btn primary">💾 保存设置</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📜 预设列表单选弹窗（对齐图2） -->
+    <div id="upw-preset-picker-dialog" class="upw-submodal-mask" style="display: none; z-index: 100000;">
+      <div class="upw-preset-dialog-card">
+        <div class="upw-preset-dialog-head">
+          <span>-- 选择预设 --</span>
+          <button id="upw-preset-picker-close" class="upw-close-icon">✕</button>
+        </div>
+        <div id="upw-preset-dialog-list" class="upw-preset-dialog-body">
+          <!-- 动态加载列表项 -->
+        </div>
+        <div class="upw-preset-dialog-foot">
+          <button id="upw-preset-picker-ok" class="upw-qy-action-btn primary">完成</button>
         </div>
       </div>
     </div>
@@ -619,9 +672,64 @@ function bindEvents() {
     render();
   });
 
+  // 顶栏打开设置
   win.querySelector('#upw-open-settings')?.addEventListener('click', () => toggleSettingsPanel(true));
   win.querySelector('#upw-settings-close')?.addEventListener('click', () => toggleSettingsPanel(false));
 
+  // 线路选择 Tab (独立 API / 酒馆主 API)
+  win.querySelectorAll('.upw-route-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      settings.apiRoute = tab.dataset.route;
+      win.querySelectorAll('.upw-route-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const form = win.querySelector('#upw-indep-form');
+      if (form) form.style.display = settings.apiRoute === 'independent' ? 'flex' : 'none';
+      persist();
+    });
+  });
+
+  // 打开/关闭预设单选弹层
+  win.querySelector('#upw-open-preset-picker')?.addEventListener('click', async () => {
+    const listContainer = document.querySelector('#upw-preset-dialog-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '<div style="padding: 20px; text-align: center; color: #999;">正在读取酒馆预设...</div>';
+    togglePresetPicker(true);
+
+    const presets = await listPresets();
+    const allPresets = ['', ...presets];
+
+    listContainer.innerHTML = allPresets.map(p => {
+      const isSelected = (settings.selectedPreset || '') === p;
+      return `
+        <div class="upw-preset-dialog-row ${isSelected ? 'active' : ''}" data-preset-val="${esc(p)}">
+          <span class="upw-preset-dialog-title">${esc(p || '-- 默认/不指定预设 --')}</span>
+          <span class="upw-radio-dot ${isSelected ? 'checked' : ''}"></span>
+        </div>
+      `;
+    }).join('');
+
+    listContainer.querySelectorAll('.upw-preset-dialog-row').forEach(row => {
+      row.addEventListener('click', () => {
+        listContainer.querySelectorAll('.upw-preset-dialog-row').forEach(r => {
+          r.classList.remove('active');
+          r.querySelector('.upw-radio-dot')?.classList.remove('checked');
+        });
+        row.classList.add('active');
+        row.querySelector('.upw-radio-dot')?.classList.add('checked');
+        settings.selectedPreset = row.dataset.presetVal;
+      });
+    });
+  });
+
+  document.querySelector('#upw-preset-picker-close')?.addEventListener('click', () => togglePresetPicker(false));
+  document.querySelector('#upw-preset-picker-ok')?.addEventListener('click', () => {
+    togglePresetPicker(false);
+    persist();
+    render();
+  });
+
+  // 缩放切换
   win.querySelectorAll('.upw-zoom-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const z = Number(btn.dataset.zoom);
@@ -633,31 +741,80 @@ function bindEvents() {
     });
   });
 
-  win.querySelectorAll('input[name="upw_api_mode"]').forEach(radio => {
-    radio.addEventListener('change', e => {
-      settings.apiMode = e.target.value;
-      const customBox = win.querySelector('#upw-custom-api-box');
-      if (customBox) customBox.style.display = settings.apiMode === 'custom' ? 'block' : 'none';
-    });
+  // 测试连接
+  win.querySelector('#upw-test-api-btn')?.addEventListener('click', async () => {
+    const url = win.querySelector('#upw-api-url')?.value?.trim();
+    const key = win.querySelector('#upw-api-key')?.value?.trim();
+    const model = win.querySelector('#upw-api-model')?.value?.trim();
+
+    if (!url) return toast('请先输入接口地址', 'warning');
+    toast('正在测试接口连接…', 'info');
+
+    try {
+      const cleanUrl = url.replace(/\/+$/, '') + '/chat/completions';
+      const r = await fetch(cleanUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: model || 'gemini-2.5-pro',
+          messages: [{ role: 'user', content: 'hi' }]
+        })
+      });
+      if (r.ok) {
+        toast('🎉 连接成功！API 鉴权与端点正常', 'success');
+      } else {
+        const errText = await r.text();
+        toast(`连接受阻 (HTTP ${r.status})：${errText.slice(0, 80)}`, 'error');
+      }
+    } catch (e) {
+      toast(`测试失败：${e.message}`, 'error');
+    }
   });
 
+  // 获取模型列表
+  win.querySelector('#upw-fetch-models-btn')?.addEventListener('click', async () => {
+    const url = win.querySelector('#upw-api-url')?.value?.trim();
+    const key = win.querySelector('#upw-api-key')?.value?.trim();
+    if (!url) return toast('请先输入接口地址', 'warning');
+
+    try {
+      toast('正在拉取模型列表…', 'info');
+      const cleanUrl = url.replace(/\/+$/, '') + '/models';
+      const r = await fetch(cleanUrl, {
+        headers: { 'Authorization': `Bearer ${key}` }
+      });
+      if (!r.ok) throw Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const models = (data?.data || []).map(m => m.id);
+      if (models.length) {
+        const picked = prompt('拉取到以下可用模型，请输入要使用的模型代号：\n' + models.slice(0, 15).join('\n'), models[0]);
+        if (picked) {
+          win.querySelector('#upw-api-model').value = picked;
+          settings.customModel = picked;
+          persist();
+        }
+      } else {
+        toast('未在此端点发现可用模型列表', 'warning');
+      }
+    } catch (e) {
+      toast(`拉取模型失败：${e.message}`, 'error');
+    }
+  });
+
+  // 保存设置
   win.querySelector('#upw-settings-save')?.addEventListener('click', () => {
     settings.customApiUrl = win.querySelector('#upw-api-url')?.value?.trim() || '';
     settings.customApiKey = win.querySelector('#upw-api-key')?.value?.trim() || '';
     settings.customModel = win.querySelector('#upw-api-model')?.value?.trim() || '';
-    settings.selectedPreset = win.querySelector('#upw-preset-select')?.value || '';
     persist();
     toggleSettingsPanel(false);
-    toast('设置已保存', 'success');
+    toast('设置保存成功！', 'success');
   });
 
-  const presetSel = win.querySelector('#upw-preset-select');
-  if (presetSel) {
-    listPresets().then(list => {
-      presetSel.innerHTML = '<option value="">跟随当前酒馆默认激活的预设</option>' + list.map(p => `<option value="${esc(p)}" ${p === settings.selectedPreset ? 'selected' : ''}>${esc(p)}</option>`).join('');
-    });
-  }
-
+  // 手风琴与菜单切换
   win.querySelectorAll('.upw-acc-header').forEach(header => {
     header.addEventListener('click', () => {
       const g = header.dataset.group;
@@ -698,8 +855,7 @@ function bindEvents() {
       const box = win.querySelector(`#upw-add-box-${cat}`);
       if (box) {
         box.style.display = 'flex';
-        const input = win.querySelector(`#upw-custom-text-${cat}`);
-        input?.focus();
+        win.querySelector(`#upw-custom-text-${cat}`)?.focus();
       }
     });
   });
@@ -720,13 +876,9 @@ function bindEvents() {
       if (!val) return toast('请输入自定义标签内容', 'warning');
 
       if (!settings.customTagsPool[cat]) settings.customTagsPool[cat] = [];
-      if (!settings.customTagsPool[cat].includes(val)) {
-        settings.customTagsPool[cat].push(val);
-      }
+      if (!settings.customTagsPool[cat].includes(val)) settings.customTagsPool[cat].push(val);
       if (!settings.selectedTags[cat]) settings.selectedTags[cat] = [];
-      if (!settings.selectedTags[cat].includes(val)) {
-        settings.selectedTags[cat].push(val);
-      }
+      if (!settings.selectedTags[cat].includes(val)) settings.selectedTags[cat].push(val);
 
       persist();
       render();
@@ -894,20 +1046,46 @@ Requirements:
 Return ONLY the outfit description directly.`;
 }
 
-// 核心健壮生成管道：完全修复端点和 Key 错配导致 502/401 报错的问题
+// 核心健壮直连引擎：彻底杜绝 502 / Unauthorized
 async function executeGeneration(prompt) {
-  // 1. 如果用户启用了独立副 API
-  if (settings.apiMode === 'custom') {
-    return await requestCustomApi(prompt);
+  // 1. 如果选择“独立 API”
+  if (settings.apiRoute === 'independent') {
+    if (!settings.customApiUrl) throw Error('请点击⚙️设置填入【接口地址】');
+    let baseUrl = settings.customApiUrl.replace(/\/+$/, '');
+    if (!baseUrl.endsWith('/chat/completions')) {
+      baseUrl += '/chat/completions';
+    }
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (settings.customApiKey) headers['Authorization'] = `Bearer ${settings.customApiKey.trim()}`;
+
+    const res = await fetch(baseUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: settings.customModel || 'gemini-2.5-pro',
+        messages: [
+          { role: 'system', content: 'You are an expert character and worldbuilding architect.' },
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw Error(`HTTP ${res.status}: ${err.slice(0, 120)}`);
+    }
+
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || data?.content || '';
   }
 
-  // 2. 优先通过酒馆最底层的通用消息补全管道（它会百分之百使用你当前的实际可用通道，不会发生 Key 错位）
+  // 2. 如果选择“酒馆主 API”
   try {
     const chatPayload = {
       prompt: prompt,
       quiet: true,
-      skip_wian: true,
-      reasoning_effort: 'medium'
+      skip_wian: true
     };
     if (settings.selectedPreset) chatPayload.preset = settings.selectedPreset;
 
@@ -923,41 +1101,20 @@ async function executeGeneration(prompt) {
       if (text) return String(text);
     }
   } catch (e1) {
-    console.warn(`[${EXT}] Primary ST chat generation failed, attempting quietPrompt fallback...`, e1);
+    console.warn(`[${EXT}] Primary ST chat generation fallback...`, e1);
   }
 
-  // 3. 次级降级：使用标准 context 的 generateQuietPrompt，注入标准参数
+  // 3. 兜底尝试 quietPrompt
   if (typeof ctx.generateQuietPrompt === 'function') {
     try {
-      const options = {
-        quietPrompt: prompt,
-        quietToLoud: false,
-        skipWIAN: true,
-        reasoning_effort: 'medium'
-      };
-      if (settings.selectedPreset) options.preset = settings.selectedPreset;
-      const res = await ctx.generateQuietPrompt(options);
+      const opt = { quietPrompt: prompt, quietToLoud: false, skipWIAN: true };
+      if (settings.selectedPreset) opt.preset = settings.selectedPreset;
+      const res = await ctx.generateQuietPrompt(opt);
       if (res) return String(res);
-    } catch (e2) {
-      console.warn(`[${EXT}] generateQuietPrompt failed, attempting generateRaw...`, e2);
-    }
+    } catch (e2) {}
   }
 
-  // 4. 再次降级：使用 generateRaw
-  if (typeof ctx.generateRaw === 'function') {
-    try {
-      const resRaw = await ctx.generateRaw({
-        prompt: prompt,
-        quietToLoud: false,
-        trimNames: true
-      });
-      if (resRaw) return String(resRaw);
-    } catch (e3) {
-      console.warn(`[${EXT}] generateRaw failed:`, e3);
-    }
-  }
-
-  throw Error('请前往右上角⚙️切换到“独立副API”，直接填入中转 URL 和 Key，即可绕开酒馆端点冲突顺利生成！');
+  throw Error('酒馆主通道发生校验冲突，请点击右上角⚙️切换到【独立 API】并输入你的端点与 Key');
 }
 
 async function generateSingleOutfit() {
@@ -1066,42 +1223,6 @@ dietary:
 backstory:
   summary: ...
 </user_persona>`;
-}
-
-async function requestCustomApi(prompt) {
-  if (!settings.customApiUrl) throw Error('请在⚙️设置中填写自定义 API URL');
-  
-  const headers = { 'Content-Type': 'application/json' };
-  if (settings.customApiKey) headers['Authorization'] = `Bearer ${settings.customApiKey}`;
-
-  const modelName = (settings.customModel || 'gpt-4o-mini').toLowerCase();
-  const isReasoningModel = modelName.includes('o1') || modelName.includes('o3') || modelName.includes('deepseek-r1') || modelName.includes('r1');
-
-  const requestBody = {
-    model: settings.customModel || 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: 'You are an expert character architect.' },
-      { role: 'user', content: prompt }
-    ],
-    reasoning_effort: 'medium'
-  };
-
-  if (!isReasoningModel) {
-    requestBody.temperature = 0.8;
-  }
-
-  const res = await fetch(settings.customApiUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw Error(`HTTP ${res.status}: ${errText.slice(0, 150)}`);
-  }
-  const data = await res.json();
-  return data?.choices?.[0]?.message?.content || '';
 }
 
 async function generatePersona() {
