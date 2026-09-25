@@ -1,3 +1,216 @@
+/* ================= 千夜浮梦风格设置面板 ================= */
+.upw-qy-card {
+  max-width: 480px;
+  background: var(--upw-bg-card);
+  border-radius: 16px;
+}
+
+.upw-qy-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upw-qy-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--upw-text-main);
+}
+
+.upw-qy-subdesc {
+  font-size: 10px;
+  color: var(--upw-text-sub);
+  margin-bottom: 2px;
+}
+
+.upw-qy-tip {
+  font-size: 10px;
+  color: var(--upw-text-sub);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.upw-route-tabs {
+  display: flex;
+  background: var(--upw-bg-main);
+  border: 1px solid var(--upw-border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.upw-route-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--upw-text-sub);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.upw-route-tab.active {
+  background: var(--upw-bg-card);
+  color: var(--upw-primary);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.upw-qy-input {
+  width: 100%;
+  border: 1px solid var(--upw-border);
+  background: var(--upw-bg-main);
+  color: var(--upw-text-main);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.upw-qy-input.readonly {
+  background: var(--upw-bg-side);
+  color: var(--upw-text-sub);
+  cursor: default;
+}
+
+.upw-input-with-btn {
+  display: flex;
+  gap: 6px;
+}
+
+.upw-qy-btn-small {
+  border: 1px solid var(--upw-border);
+  background: var(--upw-bg-card);
+  color: var(--upw-text-main);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.upw-preset-display-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--upw-border);
+  background: var(--upw-bg-main);
+  color: var(--upw-text-main);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.upw-arrow-down {
+  font-size: 10px;
+  color: var(--upw-text-sub);
+}
+
+.upw-qy-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.upw-qy-action-btn {
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upw-qy-action-btn.primary {
+  background: var(--upw-primary);
+  border: 1px solid var(--upw-primary);
+  color: #fff;
+  flex: 1;
+}
+
+.upw-qy-action-btn.secondary {
+  background: var(--upw-bg-side);
+  border: 1px solid var(--upw-border);
+  color: var(--upw-text-main);
+}
+
+/* ================= 预设选择器弹窗（对齐图2） ================= */
+.upw-preset-dialog-card {
+  width: 90%;
+  max-width: 380px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #e5e5e5;
+}
+
+.upw-preset-dialog-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eeeeee;
+  font-size: 13px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.upw-preset-dialog-body {
+  max-height: 55vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.upw-preset-dialog-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.upw-preset-dialog-row:hover {
+  background: #fafafa;
+}
+
+.upw-preset-dialog-row.active {
+  background: #f4fbf7;
+}
+
+.upw-preset-dialog-title {
+  font-size: 13px;
+  color: #333333;
+}
+
+.upw-radio-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #ccc;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.upw-radio-dot.checked {
+  border-color: #10a37f;
+  background: radial-gradient(circle, #10a37f 40%, transparent 45%);
+}
+
+.upw-preset-dialog-foot {
+  padding: 10px 16px;
+  border-top: 1px solid #eeeeee;
+  display: flex;
+  justify-content: flex-end;
+}
 /* ================= 模态窗口与遮罩 ================= */
 .upw-modal-wrapper {
   position: fixed;
