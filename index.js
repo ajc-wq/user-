@@ -1,5 +1,5 @@
-/* User Persona WorldForge - v1.7.1 (Fix 502 Validation Error & Reasoning Support) */
-const EXT = 'user-persona-worldforge', VERSION = '1.7.1';
+/* User Persona WorldForge - v1.7.2 (Fix reasoning_effort Validation Error) */
+const EXT = 'user-persona-worldforge', VERSION = '1.7.2';
 
 const MENU_TREE = [
   {
@@ -894,28 +894,54 @@ Requirements:
 Return ONLY the outfit description directly.`;
 }
 
-// 统一的 API 适配层（自动解决 reasoning_effort 校验报错与降级兜底）
+// 核心自适应生成层：解决 reasoning_effort 强校验与 502 错误
 async function executeGeneration(prompt) {
   if (settings.apiMode === 'custom') {
     return await requestCustomApi(prompt);
   }
 
-  // 走酒馆原生接口，进行防 502 参数净化与容错降级
-  try {
-    if (typeof ctx.generateQuietPrompt === 'function') {
+  // 1. 尝试使用酒馆原生静默生成，传入受控的 reasoning_effort 参数规避校验拦截
+  if (typeof ctx.generateQuietPrompt === 'function') {
+    try {
       const options = {
         quietPrompt: prompt,
         quietToLoud: false,
-        skipWIAN: true
+        skipWIAN: true,
+        // 传递合法白名单参数，防止后端报 'reasoning_effort must be one of...' 错误
+        reasoning_effort: 'medium',
+        extra_body: {
+          reasoning_effort: 'medium'
+        }
       };
       if (settings.selectedPreset) options.preset = settings.selectedPreset;
-      return await ctx.generateQuietPrompt(options);
+      const res = await ctx.generateQuietPrompt(options);
+      if (res) return String(res);
+    } catch (err) {
+      console.warn(`[${EXT}] generateQuietPrompt failed (${err.message}), trying direct ST proxy fallback...`);
     }
-  } catch (err) {
-    console.warn(`[${EXT}] generateQuietPrompt failed, trying generateRaw fallback...`, err);
   }
 
-  // 兜底降级方案：generateRaw
+  // 2. 降级兜底：通过酒馆的代理端点直接请求，完全净化冲突参数
+  try {
+    const rawRes = await fetch('/api/backends/chat-completions/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        stream: false,
+        reasoning_effort: 'medium'
+      })
+    });
+    if (rawRes.ok) {
+      const data = await rawRes.json();
+      const content = data?.choices?.[0]?.message?.content || data?.content || '';
+      if (content) return String(content);
+    }
+  } catch (err2) {
+    console.warn(`[${EXT}] ST proxy fallback failed, trying generateRaw...`, err2);
+  }
+
+  // 3. 最终兜底：generateRaw
   if (typeof ctx.generateRaw === 'function') {
     return await ctx.generateRaw({
       prompt: prompt,
@@ -924,7 +950,7 @@ async function executeGeneration(prompt) {
     });
   }
 
-  throw Error('未找到当前酒馆可用的 AI 生成接口');
+  throw Error('模型接口参数校验拦截 (502)，建议前往右上角⚙️开启“独立副API”填入端点直接生成');
 }
 
 async function generateSingleOutfit() {
@@ -1035,7 +1061,6 @@ backstory:
 </user_persona>`;
 }
 
-// 副 API 请求：自适应 o 系列等推理模型的参数限制
 async function requestCustomApi(prompt) {
   if (!settings.customApiUrl) throw Error('请在⚙️设置中填写自定义 API URL');
   
@@ -1053,9 +1078,10 @@ async function requestCustomApi(prompt) {
     ]
   };
 
-  // 如果不是推理模型，才追加常规 temperature，避免某些中转报错
   if (!isReasoningModel) {
     requestBody.temperature = 0.8;
+  } else {
+    requestBody.reasoning_effort = 'medium';
   }
 
   const res = await fetch(settings.customApiUrl, {
