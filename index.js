@@ -1,5 +1,5 @@
-/* User Persona WorldForge - v1.7.3 (Auto Reasoning Effort & Chat Completion Fix) */
-const EXT = 'user-persona-worldforge', VERSION = '1.7.3';
+/* User Persona WorldForge - v1.7.4 (Fix API Routing & Key Mismatch) */
+const EXT = 'user-persona-worldforge', VERSION = '1.7.4';
 
 const MENU_TREE = [
   {
@@ -577,7 +577,7 @@ function render() {
           <div class="upw-setting-section">
             <div class="upw-section-title">🌐 AI 接口配置 (API)</div>
             <div class="upw-radio-group">
-              <label><input type="radio" name="upw_api_mode" value="st" ${settings.apiMode === 'st' ? 'checked' : ''}> 跟随酒馆原生 API</label>
+              <label><input type="radio" name="upw_api_mode" value="st" ${settings.apiMode === 'st' ? 'checked' : ''}> 跟随酒馆当前会话 API</label>
               <label><input type="radio" name="upw_api_mode" value="custom" ${settings.apiMode === 'custom' ? 'checked' : ''}> 独立副 API</label>
             </div>
 
@@ -894,77 +894,70 @@ Requirements:
 Return ONLY the outfit description directly.`;
 }
 
-// 提取当前酒馆使用的思考强度设置，默认回退到 'auto' 或 'medium'
-function getSafeReasoningEffort() {
-  try {
-    const p = ctx.powerUser;
-    if (p?.reasoning_effort && typeof p.reasoning_effort === 'string') {
-      return p.reasoning_effort;
-    }
-  } catch {}
-  return 'auto';
-}
-
-// 核心自适应生成层：解决 reasoning_effort 强校验与 502 错误
+// 核心健壮生成管道：完全修复端点和 Key 错配导致 502/401 报错的问题
 async function executeGeneration(prompt) {
+  // 1. 如果用户启用了独立副 API
   if (settings.apiMode === 'custom') {
     return await requestCustomApi(prompt);
   }
 
-  const safeEffort = getSafeReasoningEffort();
+  // 2. 优先通过酒馆最底层的通用消息补全管道（它会百分之百使用你当前的实际可用通道，不会发生 Key 错位）
+  try {
+    const chatPayload = {
+      prompt: prompt,
+      quiet: true,
+      skip_wian: true,
+      reasoning_effort: 'medium'
+    };
+    if (settings.selectedPreset) chatPayload.preset = settings.selectedPreset;
 
-  // 1. 尝试使用酒馆原生静默生成，传入受控的 reasoning_effort 参数规避校验拦截
+    const chatRes = await fetch('/api/chat/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(chatPayload)
+    });
+
+    if (chatRes.ok) {
+      const data = await chatRes.json();
+      const text = data?.text || data?.choices?.[0]?.message?.content || data?.content || '';
+      if (text) return String(text);
+    }
+  } catch (e1) {
+    console.warn(`[${EXT}] Primary ST chat generation failed, attempting quietPrompt fallback...`, e1);
+  }
+
+  // 3. 次级降级：使用标准 context 的 generateQuietPrompt，注入标准参数
   if (typeof ctx.generateQuietPrompt === 'function') {
     try {
       const options = {
         quietPrompt: prompt,
         quietToLoud: false,
         skipWIAN: true,
-        // 传递明确合规参数，防止后端抛出 validation error
-        reasoning_effort: safeEffort,
-        chat_completion_source: 'openai',
-        extra_body: {
-          reasoning_effort: safeEffort
-        }
+        reasoning_effort: 'medium'
       };
       if (settings.selectedPreset) options.preset = settings.selectedPreset;
       const res = await ctx.generateQuietPrompt(options);
       if (res) return String(res);
-    } catch (err) {
-      console.warn(`[${EXT}] generateQuietPrompt failed (${err.message}), trying direct ST proxy fallback...`);
+    } catch (e2) {
+      console.warn(`[${EXT}] generateQuietPrompt failed, attempting generateRaw...`, e2);
     }
   }
 
-  // 2. 降级兜底：通过酒馆官方后端 chat-completions 代理端点直接请求，显式带上 reasoning_effort
-  try {
-    const rawRes = await fetch('/api/backends/chat-completions/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }],
-        stream: false,
-        reasoning_effort: safeEffort === 'auto' ? 'medium' : safeEffort
-      })
-    });
-    if (rawRes.ok) {
-      const data = await rawRes.json();
-      const content = data?.choices?.[0]?.message?.content || data?.content || '';
-      if (content) return String(content);
-    }
-  } catch (err2) {
-    console.warn(`[${EXT}] ST proxy fallback failed, trying generateRaw...`, err2);
-  }
-
-  // 3. 最终兜底：generateRaw
+  // 4. 再次降级：使用 generateRaw
   if (typeof ctx.generateRaw === 'function') {
-    return await ctx.generateRaw({
-      prompt: prompt,
-      quietToLoud: false,
-      trimNames: true
-    });
+    try {
+      const resRaw = await ctx.generateRaw({
+        prompt: prompt,
+        quietToLoud: false,
+        trimNames: true
+      });
+      if (resRaw) return String(resRaw);
+    } catch (e3) {
+      console.warn(`[${EXT}] generateRaw failed:`, e3);
+    }
   }
 
-  throw Error('模型接口参数校验拦截 (502)，建议前往右上角⚙️开启“独立副API”填入端点直接生成');
+  throw Error('请前往右上角⚙️切换到“独立副API”，直接填入中转 URL 和 Key，即可绕开酒馆端点冲突顺利生成！');
 }
 
 async function generateSingleOutfit() {
@@ -1075,7 +1068,6 @@ backstory:
 </user_persona>`;
 }
 
-// 副 API 请求：自适应思考/推理模型
 async function requestCustomApi(prompt) {
   if (!settings.customApiUrl) throw Error('请在⚙️设置中填写自定义 API URL');
   
