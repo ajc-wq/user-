@@ -1,7 +1,11 @@
-/* User Persona WorldForge - v1.0.0 (API & Preset Selector) */
-const EXT = 'user-persona-worldforge', VERSION = '1.0.0';
+/* User Persona WorldForge - v1.7.0 (Interactive Persona Preview & Importer) */
+const EXT = 'user-persona-worldforge', VERSION = '1.7.0';
 
 const MENU_TREE = [
+  {
+    name: '世界观',
+    subs: ['世界体系选择']
+  },
   {
     name: '基本信息',
     subs: ['基本设定', '性别', '种族', '年龄', '身高', '体型', '血型', '国籍地域', '学历', '婚姻状况', '跟班']
@@ -12,7 +16,7 @@ const MENU_TREE = [
   },
   {
     name: '服装与装束',
-    subs: ['衣服风格', '配饰']
+    subs: ['时代风格', '季节场景', '服装部件', '配饰', '我的专属衣柜']
   },
   {
     name: '社会身份',
@@ -29,12 +33,29 @@ const MENU_TREE = [
   {
     name: '结果输出',
     subs: ['人设预览']
+  },
+  {
+    name: '设定补充',
+    subs: ['自由设定']
   }
 ];
 
+const WORLDVIEW_HIDDEN_RULES = {
+  '现代世界观': '时代背景为现代都市。遵守现实科技、法律框架、社会阶级与常理，人设应具有现代生活质感与合理职业逻辑。',
+  '古代世界观': '时代背景为古代封建社会。遵守礼法规矩、嫡庶尊卑、江湖与朝堂架构，语言与生活细节需符合古风历史底蕴。',
+  '修仙世界观': '背景为东方修真玄幻。包含灵根资质、境界划分（练气/筑基/金丹/元婴等）、宗门世家、功法法宝、弱肉强食与因果天道法则。',
+  '末世废土': '背景为末日灾变后的废土世界。资源极度匮乏、辐射或异变横行、秩序崩塌，充满生存博弈、聚落营地、雇佣军与遗迹掠夺规则。',
+  'ABO世界观': '包含Alpha/Beta/Omega第二性别生理与社会设定。严格遵守信息素诱导、发情期与易感期、标记法则、抑制剂、腺体以及阶级权力结构。',
+  '哨兵向导': '包含哨兵（五感强化、高战力、精神图景易过载狂暴）与向导（精神疏导、情绪抚慰、共感建立）设定，严格遵守精神体伴生、向导素与结合热匹配机制。',
+  '虫族世界观': '包含虫族社会架构（雄少雌多、等级严苛）。严格遵循精神力安抚、骨翼、虫纹、精神海暴动以及雄保会/军雌支配与依附关系。'
+};
+
 const TAG_DATABASE = {
-  // ===== 基本信息 =====
-  '性别': ['女', '男', '双性', '中性', '无性别', '跨性别', '泛性别', '自定义'],
+  '世界体系选择': [
+    '现代世界观', '古代世界观', '修仙世界观', '末世废土', 'ABO世界观', '哨兵向导', '虫族世界观', '读取当前角色卡世界观'
+  ],
+
+  '性别': ['女', '男', '双性', '中性', '无性别', '跨性别', '泛性别'],
   '种族': ['人类', '血族', '狼人', '精灵', '半妖', '魔女', '道士', '机关师', '改造人', '异能者'],
   '年龄': ['12-18岁', '19-25岁', '26-32岁', '33-40岁', '41-50岁', '百年以上', '千年以上', '外观年龄≠真实年龄'],
   '身高': ['150-158cm', '159-166cm', '167-175cm', '176-185cm', '186-195cm', '娇小', '高挑', '不定'],
@@ -49,7 +70,6 @@ const TAG_DATABASE = {
   '婚姻状况': ['未婚', '已婚', '离异', '丧偶', '有恋人', '有婚约', '单身', '关系复杂'],
   '跟班': ['无跟班', '死士影卫', '贴身女仆', '忠犬保镖', '灵宠/神兽', '机械智脑', '小跟班/书童', '管家', '闺蜜/死党', '保姆兼保镖'],
 
-  // ===== 外貌特征 =====
   '发色': [
     '乌黑亮丽', '铂金白', '樱花粉', '亚麻灰', '酒红色', '雾霾蓝', '薄藤紫', '蜂蜜茶',
     '脏橘色', '薄荷绿', '彩虹挑染', '渐变紫灰', '白金挑染', '深棕栗色', '奶奶灰', '海王红',
@@ -96,15 +116,21 @@ const TAG_DATABASE = {
     '舌钉', '笑脸钉', '酒窝钉', '肚脐钉', '后颈埋钉', '锁骨埋钉', '手指穿刺', '眼角穿刺', '扩耳', '无穿刺'
   ],
 
-  // ===== 服装与装束 =====
-  '衣服风格': [
-    '宽松卫衣', '直筒牛仔裤', '白衬衫', '针织开衫', '工装裤', '帆布鞋', '格纹裙', '百褶裙',
-    '西装套装', '真丝衬衫', '高腰西裤', '尖头高跟鞋', '极简通勤装', '连帽卫衣', '棒球服', '厚底鞋',
-    '街头混搭', '皮革外套', '烟熏妆感', '尖头靴', '短上衣', '工装裙', '马丁靴', '礼服裙',
-    'JK制服', '洛丽塔', '纯欲风', '辣妹风', '运动风', '复古西装', '长风衣', '白大褂', '制服',
-    '长衫', '儒裙', '书生袍', '素色衣料', '广袖长袍', '轻纱长裙', '白色披风', '素裙', '月白长袍',
-    '劲装', '短打', '夜行衣', '护腕', '佩剑', '锦袍', '华服', '霞帔', '凤冠', '宫装',
-    '暗纹长袍', '血色披风', '狐裘', '黑纱', '魔纹衣袍'
+  '时代风格': [
+    '现代·极简风', '现代·千金名媛风', '现代·老钱风', '现代·街头潮牌', '现代·纯欲风', '现代·辣妹工装', '现代·商务通勤', '现代·学院制服',
+    '民国·旗袍风情', '民国·洋装名媛', '民国·长衫文人', '民国·军阀正装', '民国·短袄百褶裙',
+    '古代·文雅儒衫', '古代·华贵锦袍', '古代·江湖轻劲装', '古代·仙侠飘逸纱', '古代·魔道暗纹袍', '古代·素色麻裙',
+    '未来·机能机甲', '未来·赛博霓虹', '未来·废土流浪', '未来·星际舰队服', '哥特暗黑', '洛丽塔', '波西米亚'
+  ],
+  '季节场景': [
+    '春季轻薄风衣', '夏季清凉吊带', '秋季慵懒针织', '冬季加厚羊绒大衣', '冬日毛领羽绒',
+    '丝绸睡衣', '蕾丝家居服', '度假比基尼', '保守连体泳衣',
+    '高定晚礼服', '典雅鱼尾裙', '正式宴会西装', '燕尾服', '休闲运动服', '瑜伽服'
+  ],
+  '服装部件': [
+    '白衬衫', '宽松卫衣', '真丝吊带', '短款针织衫', '西装外套', '长款皮衣',
+    '高腰阔腿裤', '直筒牛仔裤', '工装束脚裤', '百褶短裙', '开叉长裙', '包臀裙',
+    '马丁靴', '尖头细高跟', '帆布鞋', '复古乐福鞋', '长筒皮靴', '绣花布鞋', '云靴'
   ],
   '配饰': [
     '黑框眼镜', '金丝眼镜', '墨镜', 'choker', '项圈', '珍珠项链', '十字架', '佛珠',
@@ -112,7 +138,6 @@ const TAG_DATABASE = {
     '发夹', '发带', '贝雷帽', '棒球帽', '丝巾', '玉冠', '金冠', '玉簪', '步摇', '流苏簪', '折扇', '玉佩', '香囊'
   ],
 
-  // ===== 社会身份 =====
   '职业身份': [
     '大学生', '研究生', '公司职员', '医生', '护士', '警察', '侦探', '黑客', '网红', '模特',
     '调酒师', '古董商', '教师', '律师', '艺人', '公子', '小姐', '少侠', '女侠', '军师',
@@ -132,7 +157,6 @@ const TAG_DATABASE = {
     '滑板', '轮滑', '自行车', '电动车', '地铁', '公交', '步行', '御剑飞行', '扫帚', '独角兽', '龙', '神兽座驾'
   ],
 
-  // ===== 性格与心理 =====
   '性格特质': [
     '理性', '毒舌', '傲娇', '粘人', '外向', '内向', '温柔', '暴躁', '固执', '机灵',
     '嘴硬心软', '孤傲', '清冷', '洒脱', '隐忍', '狠辣', '忠诚', '多疑', '善良', '从容',
@@ -158,7 +182,6 @@ const TAG_DATABASE = {
   ],
   '性格关键词': ['反差萌', '外冷内热', '嘴硬心软', '疯批美人', '温柔一刀', '清冷孤傲', '阳光阴郁', '毒舌善良', '禁欲克制', '病娇偏执'],
 
-  // ===== 生活习性 =====
   '饮食偏好': [
     '无肉不欢', '素食', '重口味', '清淡', '甜食控', '咖啡因中毒', '海鲜爱好者', '面食党',
     '米饭党', '垃圾食品', '养生', '挑食', '大胃王', '小鸟胃', '只喝水', '爱吃辣', '爱吃酸', '爱吃苦', '黑暗料理', '零食当饭'
@@ -176,33 +199,40 @@ const THEMES = [
   { id: 'warm', name: '🍂 暖杏米白' }
 ];
 
-let ctx, settings, isOpen = false, isApiModalOpen = false;
+let ctx, settings, isOpen = false, isSettingsOpen = false;
 
 function log(...a) { console.debug(`[${EXT}]`, ...a); }
 function toast(m, t = 'info') { try { (ctx?.toastr || window.toastr)?.[t]?.(m); } catch {} }
 function esc(s = '') { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function uid() { return Math.random().toString(36).slice(2, 9); }
 
 function ensureSettings() {
   const root = ctx.extensionSettings || (ctx.extensionSettings = {});
   settings = {
     theme: 'blue',
     zoom: 100,
-    openCategory: '基本信息',
-    activeSubTab: '基本设定',
+    openCategory: '世界观',
+    activeSubTab: '世界体系选择',
     selectedTags: {},
+    customTagsPool: {},
     worldName: '',
     personaName: '',
     identity: '',
     customReq: '',
+    existingPersona: '',
+    customExtraNotes: '',
     generated: '',
-    // API & 预设相关
-    apiMode: 'st', // 'st' (酒馆原生) 或 'custom' (副API)
+    currentOutfitPreview: '',
+    wardrobeList: [],
+    apiMode: 'st',
     customApiUrl: 'https://api.openai.com/v1/chat/completions',
     customApiKey: '',
     customModel: 'gpt-4o-mini',
     selectedPreset: '',
     ...(root[EXT] || {})
   };
+  if (!Array.isArray(settings.wardrobeList)) settings.wardrobeList = [];
+  if (!settings.customTagsPool) settings.customTagsPool = {};
   root[EXT] = settings;
   ctx.saveSettingsDebounced?.();
 }
@@ -218,15 +248,15 @@ function toggleModal(show) {
     render();
   } else {
     modal.classList.remove('visible');
-    toggleApiModal(false);
+    toggleSettingsPanel(false);
   }
 }
 
-function toggleApiModal(show) {
-  const apiModal = document.querySelector('#upw-api-submodal');
-  if (!apiModal) return;
-  isApiModalOpen = typeof show === 'boolean' ? show : !isApiModalOpen;
-  apiModal.style.display = isApiModalOpen ? 'flex' : 'none';
+function toggleSettingsPanel(show) {
+  const panel = document.querySelector('#upw-settings-modal');
+  if (!panel) return;
+  isSettingsOpen = typeof show === 'boolean' ? show : !isSettingsOpen;
+  panel.style.display = isSettingsOpen ? 'flex' : 'none';
 }
 
 async function listWorlds() {
@@ -239,11 +269,9 @@ async function listWorlds() {
   return [];
 }
 
-// 获取酒馆自带的全部预设列表
 async function listPresets() {
   const presets = [];
   try {
-    // 兼容酒馆原生预设获取机制
     if (ctx.getContextPresets) {
       const p = await ctx.getContextPresets();
       if (Array.isArray(p)) presets.push(...p);
@@ -260,6 +288,71 @@ async function listPresets() {
   return [...new Set(presets.filter(Boolean))];
 }
 
+async function extractCurrentCharWorldLore() {
+  try {
+    const c = ctx?.characters?.[ctx?.characterId];
+    if (!c) return '';
+    const ext = c?.data?.extensions || c?.extensions || {};
+    const worldNames = [];
+    if (ext.world) worldNames.push(ext.world);
+    if (Array.isArray(ext.worlds)) worldNames.push(...ext.worlds);
+    if (ctx?.chatMetadata?.world_info) worldNames.push(ctx.chatMetadata.world_info);
+    
+    const unique = [...new Set(worldNames.filter(Boolean))];
+    if (!unique.length) return '';
+
+    let combined = '';
+    for (const wn of unique) {
+      const r = await fetch('/api/worldinfo/get', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: wn })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const entries = Object.values(d?.entries || {});
+        for (const e of entries) {
+          if (e.disable !== true && e.content) {
+            combined += `\n[${e.comment || e.name || 'Lore'}]: ${e.content}`;
+          }
+        }
+      }
+    }
+    return combined.trim();
+  } catch {
+    return '';
+  }
+}
+
+function renderChipGridWithCustom(curSub) {
+  const baseList = TAG_DATABASE[curSub] || [];
+  const customList = settings.customTagsPool[curSub] || [];
+  const fullList = [...baseList, ...customList];
+  const curSelected = settings.selectedTags[curSub] || [];
+
+  return `
+    <div class="upw-grid-chips">
+      ${fullList.map(tag => {
+        const isAct = curSelected.includes(tag);
+        const isCustom = customList.includes(tag);
+        return `
+          <button class="upw-chip-btn ${isAct ? 'active' : ''} ${isCustom ? 'is-custom' : ''}" data-cat="${esc(curSub)}" data-tag="${esc(tag)}">
+            ${esc(tag)}${isCustom ? '<small class="upw-tag-mark">(自)</small>' : ''}
+          </button>
+        `;
+      }).join('')}
+
+      <button class="upw-chip-btn upw-chip-add-btn" data-trigger-add="${esc(curSub)}">➕ 自定义</button>
+    </div>
+
+    <div id="upw-add-box-${esc(curSub)}" class="upw-custom-input-bar" style="display: none;">
+      <input type="text" id="upw-custom-text-${esc(curSub)}" class="upw-input-field" placeholder="输入自定义${esc(curSub)}设定，如：机械改造手臂、禁欲系领主...">
+      <button class="upw-mini-btn primary" data-confirm-add="${esc(curSub)}">确定添加</button>
+      <button class="upw-mini-btn" data-cancel-add="${esc(curSub)}">取消</button>
+    </div>
+  `;
+}
+
 function render() {
   const modal = document.querySelector('#upw-modal-wrapper');
   if (!modal) return;
@@ -270,23 +363,92 @@ function render() {
     win.style.transform = `scale(${(settings.zoom || 100) / 100})`;
   }
 
-  const curSub = settings.activeSubTab || '基本设定';
+  const curSub = settings.activeSubTab || '世界体系选择';
 
   let rightContentHtml = '';
-  if (TAG_DATABASE[curSub]) {
-    const list = TAG_DATABASE[curSub];
-    const curSelected = settings.selectedTags[curSub] || [];
+
+  // 1. 结果输出 - 人设预览与自由编辑交互界面
+  if (curSub === '人设预览') {
+    rightContentHtml = `
+      <div class="upw-tab-header">
+        <div class="upw-tab-title">✨ 人设生成预览与编辑工坊</div>
+        <div class="upw-tab-hint">可在下方自由编辑润色人设文本，支持一键复制，或直接导入酒馆新建为独立 Persona！</div>
+      </div>
+      <div class="upw-form-grid">
+        <div class="upw-preview-tools">
+          <label class="upw-preview-name-label">
+            <span>人设名字：</span>
+            <input id="upw-preview-name" class="upw-input-field" value="${esc(settings.personaName || 'WorldForge Persona')}" placeholder="输入 Persona 名字">
+          </label>
+          <div class="upw-preview-btns">
+            <button id="upw-preview-copy" class="upw-mini-btn" title="复制人设文本">📋 复制人设</button>
+            <button id="upw-preview-import" class="upw-mini-btn apply" title="直接导入酒馆新建Persona">📥 导入为酒馆新人设</button>
+            <button id="upw-preview-clear" class="upw-mini-btn del" title="清空文本框">清空</button>
+          </div>
+        </div>
+        <textarea id="upw-output" class="upw-output-box" spellcheck="false" placeholder="点击下方“✨ 生成 USER 人设”后，人设将呈现在这里。你也可以直接在此粘贴或自由修改人设内容…">${esc(settings.generated)}</textarea>
+      </div>
+    `;
+  } else if (curSub === '自由设定') {
+    rightContentHtml = `
+      <div class="upw-tab-header">
+        <div class="upw-tab-title">📝 设定补充（自由长文本输入）</div>
+        <div class="upw-tab-hint">在这里可以自由输入任何额外的背景设定、隐藏暗线、专属梗或者复杂约束，AI 生成时会作为重点依据融入。</div>
+      </div>
+      <div class="upw-form-grid">
+        <textarea id="upw-extra-notes" class="upw-extra-notes-box" placeholder="在这里输入你的长篇补充设定（例如独家身世、专属神力法则、情感羁绊、说话口癖暗号等）…">${esc(settings.customExtraNotes)}</textarea>
+      </div>
+    `;
+  } else if (['时代风格', '季节场景', '服装部件', '配饰'].includes(curSub)) {
     rightContentHtml = `
       <div class="upw-tab-header">
         <div class="upw-tab-title">✨ ${esc(curSub)}</div>
-        <div class="upw-tab-hint">点击选中标签（可多选，再次点击取消）</div>
       </div>
-      <div class="upw-grid-chips">
-        ${list.map(tag => {
-          const isAct = curSelected.includes(tag);
-          return `<button class="upw-chip-btn ${isAct ? 'active' : ''}" data-cat="${esc(curSub)}" data-tag="${esc(tag)}">${esc(tag)}</button>`;
-        }).join('')}
+      ${renderChipGridWithCustom(curSub)}
+
+      <div class="upw-outfit-panel">
+        <div class="upw-outfit-panel-head">
+          <div class="upw-outfit-panel-title">👗 服装生成工坊（可脱离人设单独生成整套）</div>
+          <div class="upw-outfit-panel-actions">
+            <button id="upw-btn-gen-outfit" class="upw-mini-btn primary">✨ 单独生成这套服装</button>
+            ${settings.currentOutfitPreview ? `<button id="upw-btn-save-wardrobe" class="upw-mini-btn love">❤️ 收藏进衣柜</button>` : ''}
+          </div>
+        </div>
+        <textarea id="upw-outfit-preview" class="upw-outfit-textarea" placeholder="选中你喜欢的时代风格、季节场景或部件后，点击上方“单独生成这套服装”，整套穿搭设计将在这里实时呈现…">${esc(settings.currentOutfitPreview)}</textarea>
       </div>
+    `;
+  } else if (curSub === '我的专属衣柜') {
+    const items = settings.wardrobeList || [];
+    rightContentHtml = `
+      <div class="upw-tab-header">
+        <div class="upw-tab-title">🚪 我的专属衣柜（共 ${items.length} 套收藏）</div>
+        <div class="upw-tab-hint">不管人设如何重置或清空，衣柜收藏均永久留存，随时可一键套用！</div>
+      </div>
+      <div class="upw-wardrobe-grid">
+        ${items.length === 0 ? `
+          <div class="upw-empty-box">衣柜空空如也~ 在“服装与装束”里生成喜欢的穿搭后，点击“❤️ 收藏进衣柜”即可存放在这里！</div>
+        ` : items.map(item => `
+          <div class="upw-wardrobe-card">
+            <div class="upw-wardrobe-head">
+              <span class="upw-wardrobe-name">${esc(item.name)}</span>
+              <span class="upw-wardrobe-time">${esc(item.time)}</span>
+            </div>
+            ${item.tags?.length ? `<div class="upw-wardrobe-tags">${item.tags.map(t => `<span class="upw-mini-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+            <div class="upw-wardrobe-body">${esc(item.content)}</div>
+            <div class="upw-wardrobe-foot">
+              <button class="upw-mini-btn apply" data-apply-wardrobe="${esc(item.id)}">🪄 套用至当前人设</button>
+              <button class="upw-mini-btn del" data-del-wardrobe="${esc(item.id)}">删除</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else if (TAG_DATABASE[curSub]) {
+    rightContentHtml = `
+      <div class="upw-tab-header">
+        <div class="upw-tab-title">✨ ${esc(curSub)}</div>
+      </div>
+      ${renderChipGridWithCustom(curSub)}
     `;
   } else if (curSub === '基本设定') {
     rightContentHtml = `
@@ -298,27 +460,24 @@ function render() {
           <span>角色绑定的世界书：</span>
           <select id="upw-world-select" class="upw-input-field"><option value="">自动检测或不指定</option></select>
         </label>
+        <div class="upw-form-row">
+          <label class="upw-form-item" style="flex: 1;">
+            <span>人设名称：</span>
+            <input id="upw-name" class="upw-input-field" value="${esc(settings.personaName)}" placeholder="例如：云岚">
+          </label>
+          <label class="upw-form-item" style="flex: 1;">
+            <span>世界内身份：</span>
+            <input id="upw-identity" class="upw-input-field" value="${esc(settings.identity)}" placeholder="例如：外门弟子 / 财阀千金">
+          </label>
+        </div>
         <label class="upw-form-item">
-          <span>人设名称：</span>
-          <input id="upw-name" class="upw-input-field" value="${esc(settings.personaName)}" placeholder="例如：云岚">
-        </label>
-        <label class="upw-form-item">
-          <span>世界内身份：</span>
-          <input id="upw-identity" class="upw-input-field" value="${esc(settings.identity)}" placeholder="例如：外门弟子 / 财阀千金">
+          <span>💡 继写/已有的人设参考（选填，用于在此基础上扩写优化）：</span>
+          <textarea id="upw-existing" class="upw-input-field" rows="3" placeholder="如果已有写好的旧人设、半成品草稿，粘贴到这里，生成时AI将以此为基底进行继承与扩充！">${esc(settings.existingPersona)}</textarea>
         </label>
         <label class="upw-form-item">
           <span>补充描述或约束要求：</span>
-          <textarea id="upw-custom-req" class="upw-input-field" rows="4" placeholder="例如：性格偏清冷，不主动与人交际，保留凡人成长空间...">${esc(settings.customReq)}</textarea>
+          <textarea id="upw-custom-req" class="upw-input-field" rows="3" placeholder="例如：性格偏清冷，不主动与人交际，保留凡人成长空间...">${esc(settings.customReq)}</textarea>
         </label>
-      </div>
-    `;
-  } else if (curSub === '人设预览') {
-    rightContentHtml = `
-      <div class="upw-tab-header">
-        <div class="upw-tab-title">✨ 生成的人设结果</div>
-      </div>
-      <div class="upw-form-grid">
-        <textarea id="upw-output" class="upw-output-box" spellcheck="false" placeholder="点击下方“✨ 生成 USER 人设”后，生成结果将在此完整展示...">${esc(settings.generated)}</textarea>
       </div>
     `;
   }
@@ -334,15 +493,11 @@ function render() {
         <div class="upw-badge-tag">已选: ${totalChosen}</div>
       </div>
       <div class="upw-header-actions">
-        <!-- ⚙️ API与预设 配置小按钮 -->
-        <button id="upw-open-api-btn" class="upw-btn-compact-api" title="设置 API 与预设">⚙️ API与预设</button>
         <select id="upw-theme" class="upw-compact-select">
           ${THEMES.map(th => `<option value="${th.id}" ${th.id === settings.theme ? 'selected' : ''}>${th.name}</option>`).join('')}
         </select>
-        <select id="upw-zoom" class="upw-compact-select">
-          ${[80, 90, 100, 110].map(z => `<option value="${z}" ${z === settings.zoom ? 'selected' : ''}>${z}%</option>`).join('')}
-        </select>
-        <button id="upw-close" class="upw-close-icon">✕</button>
+        <button id="upw-open-settings" class="upw-icon-btn" title="设置（缩放/预设/API）">⚙️</button>
+        <button id="upw-close" class="upw-close-icon" title="关闭窗口">✕</button>
       </div>
     </div>
 
@@ -372,7 +527,7 @@ function render() {
                   return `
                     <button class="upw-sub-btn ${isAct ? 'active' : ''}" data-sub="${esc(sub)}">
                       <span>${esc(sub)}</span>
-                      ${subCount > 0 ? `<small>${subCount}</small>` : ''}
+                      ${sub === '我的专属衣柜' ? `<small>${(settings.wardrobeList || []).length}</small>` : (subCount > 0 ? `<small>${subCount}</small>` : '')}
                     </button>
                   `;
                 }).join('')}
@@ -396,46 +551,55 @@ function render() {
       <button id="upw-btn-import" class="upw-import-action">📥 导入Persona</button>
     </div>
 
-    <!-- API与预设 独立弹层 -->
-    <div id="upw-api-submodal" class="upw-submodal-mask" style="display: none;">
+    <!-- ⚙️ 统一设置模态弹窗 -->
+    <div id="upw-settings-modal" class="upw-submodal-mask" style="display: none;">
       <div class="upw-submodal-card">
         <div class="upw-submodal-head">
-          <span>⚙️ API 来源与酒馆预设配置</span>
-          <button id="upw-submodal-close" class="upw-close-icon">✕</button>
+          <span>⚙️ 助手设置中心</span>
+          <button id="upw-settings-close" class="upw-close-icon">✕</button>
         </div>
         <div class="upw-submodal-body">
-          <div class="upw-form-item">
-            <span>API 模式选择：</span>
-            <div class="upw-radio-group">
-              <label><input type="radio" name="upw_api_mode" value="st" ${settings.apiMode === 'st' ? 'checked' : ''}> 跟随酒馆当前主 API</label>
-              <label><input type="radio" name="upw_api_mode" value="custom" ${settings.apiMode === 'custom' ? 'checked' : ''}> 自定义独立副 API</label>
+          <div class="upw-setting-section">
+            <div class="upw-section-title">🔍 界面大小调节</div>
+            <div class="upw-zoom-grid">
+              ${[80, 90, 100, 110, 120].map(z => `
+                <button class="upw-zoom-btn ${settings.zoom === z ? 'active' : ''}" data-zoom="${z}">${z}%</button>
+              `).join('')}
             </div>
           </div>
 
-          <div id="upw-custom-api-box" style="display: ${settings.apiMode === 'custom' ? 'block' : 'none'};">
-            <label class="upw-form-item">
-              <span>自定义 API URL (兼容 OpenAI 规范)：</span>
-              <input id="upw-api-url" class="upw-input-field" value="${esc(settings.customApiUrl)}" placeholder="https://api.openai.com/v1/chat/completions">
-            </label>
-            <label class="upw-form-item">
-              <span>API Key：</span>
-              <input id="upw-api-key" type="password" class="upw-input-field" value="${esc(settings.customApiKey)}" placeholder="sk-...">
-            </label>
-            <label class="upw-form-item">
-              <span>Model 模型代号：</span>
-              <input id="upw-api-model" class="upw-input-field" value="${esc(settings.customModel)}" placeholder="例如：gpt-4o, claude-3-5-sonnet">
-            </label>
+          <div class="upw-setting-section">
+            <div class="upw-section-title">📜 文本生成预设 (Preset)</div>
+            <select id="upw-preset-select" class="upw-input-field">
+              <option value="">跟随当前酒馆默认激活的预设</option>
+            </select>
           </div>
 
-          <label class="upw-form-item">
-            <span>应用酒馆预设 (Presets)：</span>
-            <select id="upw-preset-select" class="upw-input-field">
-              <option value="">跟随当前角色默认预设</option>
-            </select>
-          </label>
+          <div class="upw-setting-section">
+            <div class="upw-section-title">🌐 AI 接口配置 (API)</div>
+            <div class="upw-radio-group">
+              <label><input type="radio" name="upw_api_mode" value="st" ${settings.apiMode === 'st' ? 'checked' : ''}> 跟随酒馆原生 API</label>
+              <label><input type="radio" name="upw_api_mode" value="custom" ${settings.apiMode === 'custom' ? 'checked' : ''}> 独立副 API</label>
+            </div>
+
+            <div id="upw-custom-api-box" class="upw-sub-form" style="display: ${settings.apiMode === 'custom' ? 'block' : 'none'};">
+              <label class="upw-form-item">
+                <span>API 接口地址 (URL)：</span>
+                <input id="upw-api-url" class="upw-input-field" value="${esc(settings.customApiUrl)}" placeholder="https://api.openai.com/v1/chat/completions">
+              </label>
+              <label class="upw-form-item">
+                <span>API 密钥 (Key)：</span>
+                <input id="upw-api-key" type="password" class="upw-input-field" value="${esc(settings.customApiKey)}" placeholder="sk-...">
+              </label>
+              <label class="upw-form-item">
+                <span>模型代号 (Model)：</span>
+                <input id="upw-api-model" class="upw-input-field" value="${esc(settings.customModel)}" placeholder="例如：gpt-4o, claude-3-5-sonnet">
+              </label>
+            </div>
+          </div>
         </div>
         <div class="upw-submodal-foot">
-          <button id="upw-api-save" class="upw-main-action">保存配置</button>
+          <button id="upw-settings-save" class="upw-main-action">保存配置</button>
         </div>
       </div>
     </div>
@@ -456,15 +620,19 @@ function bindEvents() {
     render();
   });
 
-  win.querySelector('#upw-zoom')?.addEventListener('change', e => {
-    settings.zoom = Number(e.target.value);
-    persist();
-    render();
-  });
+  win.querySelector('#upw-open-settings')?.addEventListener('click', () => toggleSettingsPanel(true));
+  win.querySelector('#upw-settings-close')?.addEventListener('click', () => toggleSettingsPanel(false));
 
-  // API 弹窗控制
-  win.querySelector('#upw-open-api-btn')?.addEventListener('click', () => toggleApiModal(true));
-  win.querySelector('#upw-submodal-close')?.addEventListener('click', () => toggleApiModal(false));
+  win.querySelectorAll('.upw-zoom-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const z = Number(btn.dataset.zoom);
+      settings.zoom = z;
+      persist();
+      win.style.transform = `scale(${z / 100})`;
+      win.querySelectorAll('.upw-zoom-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
 
   win.querySelectorAll('input[name="upw_api_mode"]').forEach(radio => {
     radio.addEventListener('change', e => {
@@ -474,25 +642,23 @@ function bindEvents() {
     });
   });
 
-  win.querySelector('#upw-api-save')?.addEventListener('click', () => {
+  win.querySelector('#upw-settings-save')?.addEventListener('click', () => {
     settings.customApiUrl = win.querySelector('#upw-api-url')?.value?.trim() || '';
     settings.customApiKey = win.querySelector('#upw-api-key')?.value?.trim() || '';
     settings.customModel = win.querySelector('#upw-api-model')?.value?.trim() || '';
     settings.selectedPreset = win.querySelector('#upw-preset-select')?.value || '';
     persist();
-    toggleApiModal(false);
-    toast('API 与预设配置已保存', 'success');
+    toggleSettingsPanel(false);
+    toast('设置已保存', 'success');
   });
 
-  // 加载酒馆预设列表
   const presetSel = win.querySelector('#upw-preset-select');
   if (presetSel) {
     listPresets().then(list => {
-      presetSel.innerHTML = '<option value="">跟随当前角色默认预设</option>' + list.map(p => `<option value="${esc(p)}" ${p === settings.selectedPreset ? 'selected' : ''}>${esc(p)}</option>`).join('');
+      presetSel.innerHTML = '<option value="">跟随当前酒馆默认激活的预设</option>' + list.map(p => `<option value="${esc(p)}" ${p === settings.selectedPreset ? 'selected' : ''}>${esc(p)}</option>`).join('');
     });
   }
 
-  // 大类与子项点击
   win.querySelectorAll('.upw-acc-header').forEach(header => {
     header.addEventListener('click', () => {
       const g = header.dataset.group;
@@ -510,8 +676,7 @@ function bindEvents() {
     });
   });
 
-  // 选项方块勾选
-  win.querySelectorAll('.upw-chip-btn').forEach(chip => {
+  win.querySelectorAll('.upw-chip-btn:not(.upw-chip-add-btn)').forEach(chip => {
     chip.addEventListener('click', () => {
       const cat = chip.dataset.cat;
       const tag = chip.dataset.tag;
@@ -528,11 +693,135 @@ function bindEvents() {
     });
   });
 
-  ['#upw-name', '#upw-identity', '#upw-custom-req', '#upw-output'].forEach(selector => {
+  win.querySelectorAll('[data-trigger-add]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.dataset.triggerAdd;
+      const box = win.querySelector(`#upw-add-box-${cat}`);
+      if (box) {
+        box.style.display = 'flex';
+        const input = win.querySelector(`#upw-custom-text-${cat}`);
+        input?.focus();
+      }
+    });
+  });
+
+  win.querySelectorAll('[data-cancel-add]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.dataset.cancelAdd;
+      const box = win.querySelector(`#upw-add-box-${cat}`);
+      if (box) box.style.display = 'none';
+    });
+  });
+
+  win.querySelectorAll('[data-confirm-add]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = btn.dataset.confirmAdd;
+      const input = win.querySelector(`#upw-custom-text-${cat}`);
+      const val = input?.value?.trim();
+      if (!val) return toast('请输入自定义标签内容', 'warning');
+
+      if (!settings.customTagsPool[cat]) settings.customTagsPool[cat] = [];
+      if (!settings.customTagsPool[cat].includes(val)) {
+        settings.customTagsPool[cat].push(val);
+      }
+      if (!settings.selectedTags[cat]) settings.selectedTags[cat] = [];
+      if (!settings.selectedTags[cat].includes(val)) {
+        settings.selectedTags[cat].push(val);
+      }
+
+      persist();
+      render();
+      toast(`已成功添加并勾选自定义标签：“${val}”`, 'success');
+    });
+  });
+
+  // 人设预览界面中的独立工具栏事件
+  win.querySelector('#upw-preview-name')?.addEventListener('input', e => {
+    settings.personaName = e.target.value;
+    persist();
+  });
+
+  win.querySelector('#upw-preview-copy')?.addEventListener('click', async () => {
+    const text = (win.querySelector('#upw-output')?.value || settings.generated || '').trim();
+    if (!text) return toast('当前还没有生成或编写人设文本', 'warning');
+    await navigator.clipboard?.writeText(text);
+    toast('人设文本已成功复制到剪贴板！', 'success');
+  });
+
+  win.querySelector('#upw-preview-import')?.addEventListener('click', importPersona);
+
+  win.querySelector('#upw-preview-clear')?.addEventListener('click', () => {
+    settings.generated = '';
+    const out = win.querySelector('#upw-output');
+    if (out) out.value = '';
+    persist();
+    toast('已清空当前人设文本', 'info');
+  });
+
+  win.querySelector('#upw-extra-notes')?.addEventListener('input', e => {
+    settings.customExtraNotes = e.target.value;
+    persist();
+  });
+
+  win.querySelector('#upw-outfit-preview')?.addEventListener('input', e => {
+    settings.currentOutfitPreview = e.target.value;
+    persist();
+  });
+
+  win.querySelector('#upw-btn-gen-outfit')?.addEventListener('click', generateSingleOutfit);
+
+  win.querySelector('#upw-btn-save-wardrobe')?.addEventListener('click', () => {
+    const content = (settings.currentOutfitPreview || '').trim();
+    if (!content) return toast('当前还没有生成或编写服装内容哦', 'warning');
+
+    const styleTags = [
+      ...(settings.selectedTags['时代风格'] || []),
+      ...(settings.selectedTags['季节场景'] || []),
+      ...(settings.selectedTags['服装部件'] || [])
+    ];
+
+    const newSuit = {
+      id: uid(),
+      name: styleTags[0] ? `${styleTags[0]} 穿搭` : `定制穿搭 #${settings.wardrobeList.length + 1}`,
+      tags: styleTags.slice(0, 4),
+      content: content,
+      time: new Date().toLocaleDateString()
+    };
+
+    settings.wardrobeList.unshift(newSuit);
+    persist();
+    render();
+    toast('已永久收藏至我的衣柜！', 'success');
+  });
+
+  win.querySelectorAll('[data-apply-wardrobe]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.applyWardrobe;
+      const suit = (settings.wardrobeList || []).find(x => x.id === id);
+      if (!suit) return;
+      settings.currentOutfitPreview = suit.content;
+      settings.customReq = (settings.customReq ? settings.customReq + '\n' : '') + `【穿搭方案指定】：${suit.content}`;
+      persist();
+      toast(`已套用“${suit.name}”至人设约束！`, 'success');
+    });
+  });
+
+  win.querySelectorAll('[data-del-wardrobe]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.delWardrobe;
+      settings.wardrobeList = (settings.wardrobeList || []).filter(x => x.id !== id);
+      persist();
+      render();
+      toast('已从衣柜移出该收藏', 'info');
+    });
+  });
+
+  ['#upw-name', '#upw-identity', '#upw-custom-req', '#upw-existing', '#upw-output'].forEach(selector => {
     win.querySelector(selector)?.addEventListener('input', e => {
       if (selector === '#upw-name') settings.personaName = e.target.value;
       if (selector === '#upw-identity') settings.identity = e.target.value;
       if (selector === '#upw-custom-req') settings.customReq = e.target.value;
+      if (selector === '#upw-existing') settings.existingPersona = e.target.value;
       if (selector === '#upw-output') settings.generated = e.target.value;
       persist();
     });
@@ -551,13 +840,14 @@ function bindEvents() {
 
   win.querySelector('#upw-btn-clear')?.addEventListener('click', () => {
     settings.selectedTags = {};
+    settings.currentOutfitPreview = '';
     persist();
     render();
-    toast('已清空所选标签', 'info');
+    toast('已清空所选标签（衣柜、自定义项与补充设定依然完好保存）', 'info');
   });
 
   win.querySelector('#upw-btn-random')?.addEventListener('click', () => {
-    const randomPicks = ['性别', '种族', '体型', '发色', '发型', '脸型', '眼睛', '职业身份', '性格特质', '衣服风格'];
+    const randomPicks = ['性别', '种族', '体型', '发色', '发型', '脸型', '眼睛', '职业身份', '性格特质', '时代风格'];
     randomPicks.forEach(cat => {
       const arr = TAG_DATABASE[cat];
       if (arr) settings.selectedTags[cat] = [arr[Math.floor(Math.random() * arr.length)]];
@@ -576,20 +866,111 @@ function bindEvents() {
   win.querySelector('#upw-btn-import')?.addEventListener('click', importPersona);
 }
 
-function buildPrompt() {
+function buildOutfitOnlyPrompt() {
+  const outfitPicks = [];
+  ['时代风格', '季节场景', '服装部件', '配饰'].forEach(cat => {
+    if (settings.selectedTags[cat]?.length) {
+      outfitPicks.push(`${cat}: ${settings.selectedTags[cat].join('、')}`);
+    }
+  });
+
+  const worldviews = settings.selectedTags['世界体系选择'] || [];
+
+  return `You are a high fashion stylist and character costume designer.
+Design ONE comprehensive, vivid, aesthetic outfit ensemble based on the chosen keywords.
+
+World Context: ${worldviews.join('、') || '常规现代'}
+Costume Keywords:
+${outfitPicks.length ? outfitPicks.join('\n') : '由你设计一套极具美感与协调感的完整服装套组'}
+
+Requirements:
+1. Output in natural Chinese.
+2. Structure the description into:
+   - 【整体风格与配色】
+   - 【上装与外袍】
+   - 【下装与裙身】
+   - 【鞋履与细节配件】
+   - 【随身配饰与氛围感】
+3. Describe material textures, silhouette, tailoring cuts, and aesthetic vibe clearly.
+
+Return ONLY the outfit description directly.`;
+}
+
+async function generateSingleOutfit() {
+  const btn = document.querySelector('#upw-btn-gen-outfit');
+  if (btn) btn.disabled = true;
+  try {
+    toast('正在单独为你设计全套服装穿搭…');
+    const prompt = buildOutfitOnlyPrompt();
+    let out = '';
+
+    if (settings.apiMode === 'custom') {
+      out = await requestCustomApi(prompt);
+    } else {
+      const gen = ctx.generateQuietPrompt || ctx.generateRaw;
+      if (typeof gen !== 'function') throw Error('未找到酒馆可用的 AI 生成接口');
+      const options = { quietPrompt: prompt, quietToLoud: false, skipWIAN: true };
+      if (settings.selectedPreset) options.preset = settings.selectedPreset;
+
+      if (ctx.generateQuietPrompt) out = await ctx.generateQuietPrompt(options);
+      else out = await ctx.generateRaw({ prompt, quietToLoud: false, trimNames: true });
+    }
+
+    settings.currentOutfitPreview = String(out || '').trim();
+    persist();
+    render();
+    toast('整套穿搭方案生成完毕！可点击收藏进衣柜', 'success');
+  } catch (e) {
+    console.error(e);
+    toast(`服装生成失败：${e.message}`, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function buildPrompt() {
   const chosenList = [];
   for (const cat in settings.selectedTags) {
+    if (cat === '世界体系选择') continue;
     if (settings.selectedTags[cat]?.length) {
       chosenList.push(`${cat}: ${settings.selectedTags[cat].join('、')}`);
     }
   }
 
+  const selectedWorldviews = settings.selectedTags['世界体系选择'] || [];
+  let hiddenWorldviewConstraints = [];
+
+  for (const wv of selectedWorldviews) {
+    if (WORLDVIEW_HIDDEN_RULES[wv]) {
+      hiddenWorldviewConstraints.push(`- 【${wv}绝对法则】：${WORLDVIEW_HIDDEN_RULES[wv]}`);
+    }
+  }
+
+  if (selectedWorldviews.includes('读取当前角色卡世界观')) {
+    const charLore = await extractCurrentCharWorldLore();
+    if (charLore) {
+      hiddenWorldviewConstraints.push(`- 【当前角色卡世界设定】：\n${charLore.slice(0, 3000)}`);
+    }
+  }
+
+  const hasExisting = Boolean(settings.existingPersona && settings.existingPersona.trim());
+  const hasExtraNotes = Boolean(settings.customExtraNotes && settings.customExtraNotes.trim());
+
   return `You are a SillyTavern USER Persona architect.
-Create one player USER persona matching the chosen options below.
+${hasExisting 
+  ? 'TASK: EXPAND and REFINE the existing persona below by seamlessly incorporating the newly chosen tags and world laws without breaking prior canon.' 
+  : 'TASK: CREATE a fresh player USER persona matching the chosen options and world laws below.'}
 
 Rules:
 1. All persona schema keys MUST remain in English. The descriptive values must be natural Chinese.
-2. Seamlessly integrate the Chosen Features into the persona.
+2. Incorporate the Chosen Features and strictly obey the Underlying Worldview Laws.
+${settings.currentOutfitPreview ? `3. Explicit Attire Design to use: ${settings.currentOutfitPreview.slice(0, 400)}` : ''}
+${hasExisting ? '4. Hard Constraint: Preserve and expand upon the core personality and background in the Existing Persona text.' : ''}
+${hasExtraNotes ? '5. Special Constraint: Strictly obey and naturally integrate the Custom Notes/Settings into the persona.' : ''}
+
+${hiddenWorldviewConstraints.length ? `[Underlying Worldview Constraints & Canon Laws]:\n${hiddenWorldviewConstraints.join('\n')}\n` : ''}
+${hasExisting ? `[Existing Persona to Inherit/Expand]:\n${settings.existingPersona.trim()}\n` : ''}
+${hasExtraNotes ? `[Custom Extra Notes / 专属设定补充]:\n${settings.customExtraNotes.trim()}\n` : ''}
 
 Chosen Features:
 ${chosenList.length ? chosenList.join('\n') : '由AI自由发挥'}
@@ -615,7 +996,9 @@ appearance:
   skin: ...
   tattoos_and_piercings: ...
 attire:
-  style: ...
+  era_and_style: ...
+  seasonal_and_occasional: ...
+  pieces: ...
   accessories: ...
 social_persona:
   skills: ...
@@ -633,7 +1016,6 @@ backstory:
 </user_persona>`;
 }
 
-// 独立副 API 发生请求
 async function requestCustomApi(prompt) {
   if (!settings.customApiUrl) throw Error('请在⚙️设置中填写自定义 API URL');
   
@@ -662,11 +1044,12 @@ async function generatePersona() {
   const btn = document.querySelector('#upw-btn-gen');
   if (btn) btn.disabled = true;
   try {
-    const prompt = buildPrompt();
+    toast('正在解析世界观法则与选项标签…');
+    const prompt = await buildPrompt();
     let out = '';
 
     if (settings.apiMode === 'custom') {
-      toast('正在通过自定义副 API 生成人设…');
+      toast('正在通过副 API 生成人设…');
       out = await requestCustomApi(prompt);
     } else {
       const gen = ctx.generateQuietPrompt || ctx.generateRaw;
@@ -674,7 +1057,6 @@ async function generatePersona() {
       toast('正在通过酒馆主 API 生成人设…');
 
       const options = { quietPrompt: prompt, quietToLoud: false, skipWIAN: true };
-      // 若选择了预设，传递给生成参数
       if (settings.selectedPreset) options.preset = settings.selectedPreset;
 
       if (ctx.generateQuietPrompt) out = await ctx.generateQuietPrompt(options);
@@ -686,7 +1068,7 @@ async function generatePersona() {
     settings.activeSubTab = '人设预览';
     persist();
     render();
-    toast('人设生成完成！已切换至预览', 'success');
+    toast('人设生成完成！已切换至预览工坊', 'success');
   } catch (e) {
     console.error(e);
     toast(`生成失败：${e.message}`, 'error');
@@ -695,19 +1077,37 @@ async function generatePersona() {
   }
 }
 
+// 核心：直接导入酒馆新建为原生 Persona
 async function importPersona() {
-  const desc = (settings.generated || '').trim();
-  if (!desc) return toast('请先生成或输入人设内容', 'warning');
-  const name = (settings.personaName || 'WorldForge Persona').trim();
+  const desc = (document.querySelector('#upw-output')?.value || settings.generated || '').trim();
+  if (!desc) return toast('当前没有可导入的人设内容，请先生成或输入', 'warning');
+  const name = (document.querySelector('#upw-preview-name')?.value || settings.personaName || 'WorldForge Persona').trim();
+
   try {
     const exec = ctx.executeSlashCommandsWithOptions || ctx.executeSlashCommands;
     if (typeof exec === 'function') {
       const arg = s => JSON.stringify(String(s)).replace(/^"|"$/g, '').replace(/ /g, '\\ ');
-      await exec(`/persona-create name=${arg(name)} description=${arg(desc)}`);
-      toast('已成功导入为原生 Persona！', 'success');
+      try {
+        await exec(`/persona-create name=${arg(name)} description=${arg(desc)}`, { handleParserErrors: true });
+      } catch {
+        await exec(`/persona-create name=${arg(name)} description=${arg(desc)}`);
+      }
+      toast(`已成功在酒馆中新建人设：“${name}”！`, 'success');
       return;
     }
-    throw Error('未能调用酒馆 /persona-create 命令');
+
+    // 备用写入方案
+    const p = ctx.powerUser;
+    if (p?.personas && p?.persona_descriptions) {
+      const avatar = `worldforge-${uid()}.png`;
+      p.personas[avatar] = name;
+      p.persona_descriptions[avatar] = desc;
+      persist();
+      toast(`已写入酒馆 Persona：“${name}”，可在人设管理中查看`, 'success');
+      return;
+    }
+
+    throw Error('未能唤起酒馆的原生 Persona 接口');
   } catch (e) {
     console.error(e);
     toast(`导入失败：${e.message}`, 'error');
