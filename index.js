@@ -1,5 +1,5 @@
-/* User Persona WorldForge - v1.7.0 (Interactive Persona Preview & Importer) */
-const EXT = 'user-persona-worldforge', VERSION = '1.7.0';
+/* User Persona WorldForge - v1.7.1 (Fix 502 Validation Error & Reasoning Support) */
+const EXT = 'user-persona-worldforge', VERSION = '1.7.1';
 
 const MENU_TREE = [
   {
@@ -367,7 +367,6 @@ function render() {
 
   let rightContentHtml = '';
 
-  // 1. 结果输出 - 人设预览与自由编辑交互界面
   if (curSub === '人设预览') {
     rightContentHtml = `
       <div class="upw-tab-header">
@@ -731,11 +730,10 @@ function bindEvents() {
 
       persist();
       render();
-      toast(`已成功添加并勾选自定义标签：“${val}”`, 'success');
+      toast(`已添加自定义标签：“${val}”`, 'success');
     });
   });
 
-  // 人设预览界面中的独立工具栏事件
   win.querySelector('#upw-preview-name')?.addEventListener('input', e => {
     settings.personaName = e.target.value;
     persist();
@@ -896,25 +894,46 @@ Requirements:
 Return ONLY the outfit description directly.`;
 }
 
+// 统一的 API 适配层（自动解决 reasoning_effort 校验报错与降级兜底）
+async function executeGeneration(prompt) {
+  if (settings.apiMode === 'custom') {
+    return await requestCustomApi(prompt);
+  }
+
+  // 走酒馆原生接口，进行防 502 参数净化与容错降级
+  try {
+    if (typeof ctx.generateQuietPrompt === 'function') {
+      const options = {
+        quietPrompt: prompt,
+        quietToLoud: false,
+        skipWIAN: true
+      };
+      if (settings.selectedPreset) options.preset = settings.selectedPreset;
+      return await ctx.generateQuietPrompt(options);
+    }
+  } catch (err) {
+    console.warn(`[${EXT}] generateQuietPrompt failed, trying generateRaw fallback...`, err);
+  }
+
+  // 兜底降级方案：generateRaw
+  if (typeof ctx.generateRaw === 'function') {
+    return await ctx.generateRaw({
+      prompt: prompt,
+      quietToLoud: false,
+      trimNames: true
+    });
+  }
+
+  throw Error('未找到当前酒馆可用的 AI 生成接口');
+}
+
 async function generateSingleOutfit() {
   const btn = document.querySelector('#upw-btn-gen-outfit');
   if (btn) btn.disabled = true;
   try {
     toast('正在单独为你设计全套服装穿搭…');
     const prompt = buildOutfitOnlyPrompt();
-    let out = '';
-
-    if (settings.apiMode === 'custom') {
-      out = await requestCustomApi(prompt);
-    } else {
-      const gen = ctx.generateQuietPrompt || ctx.generateRaw;
-      if (typeof gen !== 'function') throw Error('未找到酒馆可用的 AI 生成接口');
-      const options = { quietPrompt: prompt, quietToLoud: false, skipWIAN: true };
-      if (settings.selectedPreset) options.preset = settings.selectedPreset;
-
-      if (ctx.generateQuietPrompt) out = await ctx.generateQuietPrompt(options);
-      else out = await ctx.generateRaw({ prompt, quietToLoud: false, trimNames: true });
-    }
+    const out = await executeGeneration(prompt);
 
     settings.currentOutfitPreview = String(out || '').trim();
     persist();
@@ -1016,26 +1035,39 @@ backstory:
 </user_persona>`;
 }
 
+// 副 API 请求：自适应 o 系列等推理模型的参数限制
 async function requestCustomApi(prompt) {
   if (!settings.customApiUrl) throw Error('请在⚙️设置中填写自定义 API URL');
   
   const headers = { 'Content-Type': 'application/json' };
   if (settings.customApiKey) headers['Authorization'] = `Bearer ${settings.customApiKey}`;
 
+  const modelName = (settings.customModel || 'gpt-4o-mini').toLowerCase();
+  const isReasoningModel = modelName.includes('o1') || modelName.includes('o3') || modelName.includes('deepseek-r1') || modelName.includes('r1');
+
+  const requestBody = {
+    model: settings.customModel || 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: 'You are an expert character architect.' },
+      { role: 'user', content: prompt }
+    ]
+  };
+
+  // 如果不是推理模型，才追加常规 temperature，避免某些中转报错
+  if (!isReasoningModel) {
+    requestBody.temperature = 0.8;
+  }
+
   const res = await fetch(settings.customApiUrl, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model: settings.customModel || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are an expert character architect.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.8
-    })
+    body: JSON.stringify(requestBody)
   });
 
-  if (!res.ok) throw Error(`副 API 请求失败: HTTP ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text();
+    throw Error(`HTTP ${res.status}: ${errText.slice(0, 150)}`);
+  }
   const data = await res.json();
   return data?.choices?.[0]?.message?.content || '';
 }
@@ -1046,29 +1078,14 @@ async function generatePersona() {
   try {
     toast('正在解析世界观法则与选项标签…');
     const prompt = await buildPrompt();
-    let out = '';
-
-    if (settings.apiMode === 'custom') {
-      toast('正在通过副 API 生成人设…');
-      out = await requestCustomApi(prompt);
-    } else {
-      const gen = ctx.generateQuietPrompt || ctx.generateRaw;
-      if (typeof gen !== 'function') throw Error('未找到酒馆可用的 AI 生成接口');
-      toast('正在通过酒馆主 API 生成人设…');
-
-      const options = { quietPrompt: prompt, quietToLoud: false, skipWIAN: true };
-      if (settings.selectedPreset) options.preset = settings.selectedPreset;
-
-      if (ctx.generateQuietPrompt) out = await ctx.generateQuietPrompt(options);
-      else out = await ctx.generateRaw({ prompt, quietToLoud: false, trimNames: true });
-    }
+    const out = await executeGeneration(prompt);
 
     settings.generated = String(out || '').trim();
     settings.openCategory = '结果输出';
     settings.activeSubTab = '人设预览';
     persist();
     render();
-    toast('人设生成完成！已切换至预览工坊', 'success');
+    toast('人设生成完成！已切换至预览', 'success');
   } catch (e) {
     console.error(e);
     toast(`生成失败：${e.message}`, 'error');
@@ -1077,7 +1094,6 @@ async function generatePersona() {
   }
 }
 
-// 核心：直接导入酒馆新建为原生 Persona
 async function importPersona() {
   const desc = (document.querySelector('#upw-output')?.value || settings.generated || '').trim();
   if (!desc) return toast('当前没有可导入的人设内容，请先生成或输入', 'warning');
@@ -1096,7 +1112,6 @@ async function importPersona() {
       return;
     }
 
-    // 备用写入方案
     const p = ctx.powerUser;
     if (p?.personas && p?.persona_descriptions) {
       const avatar = `worldforge-${uid()}.png`;
